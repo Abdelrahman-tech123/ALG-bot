@@ -8,6 +8,7 @@ from app.database import Base
 class User(Base):
     __tablename__ = "users"
 
+    # الـ ID هنا أصبح UUID فريد ومحمي
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
@@ -21,8 +22,10 @@ class User(Base):
 class Company(Base):
     __tablename__ = "companies"
 
+    # الـ ID بتاع الشركة برضه أصبح UUID فخم وعشوائي
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4, index=True)
     
+    # الـ user_id تم تعديله لـ UUID ليطابق id المستخدم المرتبط به بالملي
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     
     source = Column(String(50), nullable=False)
@@ -32,13 +35,13 @@ class Company(Base):
     website = Column(Text, nullable=True)
     location = Column(Text, nullable=True)
     
-    # تغيير الاسم ليطابق scraped_at الموجود في داتابيز Neon عندك
+    # اسم الحقل مطابق لـ Neon عندك
     scraped_at = Column(DateTime, default=datetime.utcnow)
 
     # العودة للمستخدم المالك
     owner = relationship("User", back_populates="companies")
 
-    # تطبيق الـ Unique Constraints اللي أنت عاملها في الصورة بالظبط لمنع التكرار
+    # الـ Unique Constraints لمنع التكرار للمستخدم نفسه
     __table_args__ = (
         UniqueConstraint('user_id', 'email', name='uq_user_email'),
         UniqueConstraint('user_id', 'phone', name='uq_user_phone'),

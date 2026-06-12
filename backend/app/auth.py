@@ -18,12 +18,14 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/auth/login")
 
 # hash the incoming password from the user
-def get_password_hash(password: str) -> str :
-    return pwd_context.hash(password)
+def get_password_hash(password: str) -> str:
+    safe_password = password[:72] 
+    return pwd_context.hash(safe_password)
 
 # check if the password is correct
-def verify_password(plain_password: str, hashed_password: str) -> bool :
-    return pwd_context.verify(plain_password , hashed_password)
+def verify_password(plain_password: str, hashed_password: str) -> bool:
+    safe_password = plain_password[:72]
+    return pwd_context.verify(safe_password, hashed_password)
 
 # generate an access token
 def create_access_token(data: dict) :
