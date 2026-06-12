@@ -24,7 +24,6 @@ app.add_middleware(
 )
 
 app.include_router(auth_routes.router, prefix="/api/auth", tags=["Authentication"])
-app.include_router(scrape_routes.router, prefix="/api", tags=["Scraper & Data"])
 
 @app.get("/", tags=["Root"])
 def read_root():
