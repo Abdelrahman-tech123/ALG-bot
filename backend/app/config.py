@@ -7,8 +7,12 @@ class Settings(BaseSettings):
     JWT_SECRET : str = ""
     JWT_ALGORITHM : str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES : int = 1440
-
+    DEBUG_MODE : bool = True
     class Config:
         env_file = ".env"
 
 settings = Settings()
+
+def debug_print(*args, **kwargs ):
+        if (settings.DEBUG_MODE):
+            print("[DEBUG] : " , *args, **kwargs)

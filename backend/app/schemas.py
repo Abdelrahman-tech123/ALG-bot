@@ -42,7 +42,8 @@ class TokenData(BaseModel):
 class ScrapeRequest(BaseModel):
     keyword: str
     location: str
-    source: str 
+    source: Optional[str] = "Google Maps" 
+    max_results : int
 
 class CompanyResponse(BaseModel):
     id: uuid.UUID # 👈 حتى الشركات بقت UUID عشان الـ URLs في الفرونت إند تكون مشفرة وصعبة التخمين

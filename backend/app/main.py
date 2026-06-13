@@ -1,7 +1,19 @@
+import sys
+import asyncio
+import os
+
+# 🟢 إجبار الويندوز على البرواكتور وضبط مسار بايثون
+if sys.platform == 'win32':
+    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
+    os.environ['PYTHONPATH'] = os.getcwd()
+
+os.environ['TOKENIZERS_PARALLELISM'] = 'false'
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
 from app.routers import auth_routes, scrape_routes
+from app.config import settings
 
 # Initialize the FastAPI app
 app = FastAPI(
@@ -24,6 +36,7 @@ app.add_middleware(
 )
 
 app.include_router(auth_routes.router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(scrape_routes.router , prefix="/api/scrape" , tags=["Scraper"])
 
 @app.get("/", tags=["Root"])
 def read_root():
