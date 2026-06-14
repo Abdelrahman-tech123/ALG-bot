@@ -1,6 +1,6 @@
 # pydantic models validation for data
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional , List
 from datetime import datetime
 import uuid
 
@@ -47,12 +47,16 @@ class ScrapeRequest(BaseModel):
 
 class CompanyResponse(BaseModel):
     id: uuid.UUID # 👈 حتى الشركات بقت UUID عشان الـ URLs في الفرونت إند تكون مشفرة وصعبة التخمين
+    keyword : Optional[str] = None
     company_name: str
     phone: Optional[str] = None
-    email: Optional[str] = None
+    email: list[str] = []
     website: Optional[str] = None
     location: Optional[str] = None
+    maps_link: Optional[str] = None
     source: str
+    open_times: List[str] = []
+    first_image: Optional[str] = None
     scraped_at: datetime 
 
     class Config:
