@@ -1,6 +1,5 @@
 import asyncio
 import re
-import traceback
 from typing import List, Dict, Any
 from collections import Counter
 from playwright.async_api import async_playwright, Page, BrowserContext

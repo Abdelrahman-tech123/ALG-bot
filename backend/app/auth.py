@@ -1,7 +1,5 @@
 # JWT and Hashing
 from datetime import datetime, timedelta
-from typing import Optional
-import uuid
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status

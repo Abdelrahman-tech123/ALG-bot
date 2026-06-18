@@ -2,7 +2,6 @@ import sys
 import asyncio
 import os
 
-# 🟢 إجبار الويندوز على البرواكتور وضبط مسار بايثون
 if sys.platform == 'win32':
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
     os.environ['PYTHONPATH'] = os.getcwd()
@@ -24,7 +23,7 @@ app = FastAPI(
 
 origins = [
     "http://localhost:3000",
-    "http://localhost:3001",
+    settings.NEXT_FRONTEND_URL,
 ]
 
 app.add_middleware(
@@ -35,6 +34,8 @@ app.add_middleware(
     allow_headers=["*"],              # السماح بجميع أنواع الـ Headers
 )
 
+
+# routes
 app.include_router(auth_routes.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(scrape_routes.router , prefix="/api/scrape" , tags=["Scraper"])
 app.include_router(companies_routes.router , prefix="/api/companies" , tags=["Companies"])
