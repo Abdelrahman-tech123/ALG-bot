@@ -34,10 +34,10 @@ const translations = {
         sign_in_here: "سجل دخولك من هنا",
         welcome: "مرحباً بك،",
         logout: "تسجيل الخروج",
-        control_panel: "🤖 لوحة التحكم في محرك الكشط",
+        control_panel: "🤖 لوحة التحكم في المحرك ",
         running_engine_status: "المحرك يعمل",
         keyword_label: "الكلمة المفتاحية (Keyword)",
-        keyword_placeholder: "مثال: مطاعم، شركات شحن",
+        keyword_placeholder: "مثال: مطعم شركة شحن",
         location_label: "الموقع الجغرافي (Location)",
         location_placeholder: "مثال: القاهرة، جدة",
         platform_label: "المنصة المستهدفة",
@@ -59,9 +59,24 @@ const translations = {
         search_match: "مطابقة البحث لـ",
         results_found: "العناصر المكتشفة بالبحث",
         of: "من أصل",
+        map: "الخريطة",
+        working_hours: "مواعيد العمل",
+        detailed_info: "البيانات التفصيلية",
+        no_email: "لا يوجد بريد إلكتروني",
+        open_in_map: "فتح في الخريطة",
+        close: "إغلاق",
+        export_data: "تصدير البيانات",
+        select_all: "تحديد الكل",
+        deselect_all: "إلغاء تحديد الكل",
+        file_name: "اسم الملف",
+        enter_file_name: "أدخل اسم الملف...",
+        export: "تصدير",
+        exporting: "جاري التصدير...",
+        previous: "السابق",
+        next: "التالي",
     },
     en: {
-        logo: "🌐 Data Scraper Hub",
+        logo: "🌐 Data Scraper AI",
         login_title: "Sign In",
         login_subtitle: "Start extracting data and building your lead lists",
         register_title: "Create New Account",
@@ -82,7 +97,7 @@ const translations = {
         control_panel: "🤖 Scraper Engine Control Panel",
         running_engine_status: "Engine running",
         keyword_label: "Keyword",
-        keyword_placeholder: "e.g., restaurants, tech companies",
+        keyword_placeholder: "e.g., restaurant, tech companie",
         location_label: "Location",
         location_placeholder: "e.g., Cairo, Dubai",
         platform_label: "Target Platform",
@@ -104,18 +119,47 @@ const translations = {
         search_match: "Search matches",
         results_found: "Result found",
         of: "of",
+        map: "Map",
+        working_hours: "Working hours",
+        detailed_info: "Detailed info",
+        no_email: "No email address",
+        open_in_map: "Open in map",
+        close: "Close",
+        export_data: "Export Data",
+        select_all: "Select All",
+        deselect_all: "Deselect All",
+        file_name: "File Name",
+        enter_file_name: "Enter file name...",
+        export: "Export",
+        exporting: "Exporting...",
+        previous: "Previous",
+        next: "Next",
     }
 };
 
 export function AppProvider({ children }: { children: React.ReactNode }) {
-    const [theme, setTheme] = useState<Theme>("dark");
-    const [lang, setLang] = useState<Lang>("ar");
+    const [theme, setTheme] = useState<Theme>(() => {
+        if (typeof window === "undefined") return "light";
+        return (localStorage.getItem("theme") as Theme) || "light";
+    });
+    const [lang, setLang] = useState<Lang>(() => {
+        if (typeof window === "undefined") return "ar";
+        return (localStorage.getItem("lang") as Lang) || "ar";
+    });
 
     useEffect(() => {
         const root = window.document.documentElement;
-        if (theme === "dark") root.classList.add("dark");
-        else root.classList.remove("dark");
+        root.classList.toggle("dark", theme === "dark");
+        try {
+            localStorage.setItem("theme", theme);
+        } catch (e) { }
     }, [theme]);
+
+    useEffect(() => {
+        try {
+            localStorage.setItem("lang", lang);
+        } catch (e) { }
+    }, [lang]);
 
     const toggleTheme = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
 

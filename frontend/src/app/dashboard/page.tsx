@@ -13,8 +13,15 @@ import { Search, Download, RefreshCw, Cpu, LogOut, AlertCircle, Layers, ArrowUpR
 
 export default function DashboardPage() {
     const { t } = useApp();
-    const { data: session, status } = useSession();
     const router = useRouter();
+
+    // require session and redirect immediately when unauthenticated
+    const { data: session, status } = useSession({
+        required: true,
+        onUnauthenticated() {
+            router.push('/login');
+        }
+    });
 
     const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
@@ -37,7 +44,7 @@ export default function DashboardPage() {
         if (status !== "authenticated") return;
 
         try {
-            const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/companies`, {
+            const response = await (await import("../../lib/api")).default.get(`/api/companies`, {
                 params: {
                     place: activePlace || undefined,
                     location: activeLocation || undefined,
@@ -89,12 +96,14 @@ export default function DashboardPage() {
     }, [currentPage, companies, totalItems, scraping, fetchCompanies]);
 
     useEffect(() => {
+        // 1. إذا كان لا يزال يحمل، لا تفعل شيئاً
+        if (status === "loading") return;
+
         if (status === "authenticated" && companies.length === 0) {
             fetchCompanies(100, true);
-        } else if (status === "unauthenticated") {
-            router.push("/login");
         }
-    }, [status, router]);
+
+    }, [status, companies.length, fetchCompanies]);
 
     const filteredCompanies = useMemo(() => {
         if (!searchQuery.trim()) return companies;
@@ -134,7 +143,7 @@ export default function DashboardPage() {
         e.preventDefault();
         setScraping(true);
         try {
-            await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/scrape/run`, {
+            await (await import("../../lib/api")).default.post(`/api/scrape/run`, {
                 keyword: keywordInput,
                 location: locationInput,
                 source,
@@ -156,7 +165,7 @@ export default function DashboardPage() {
 
             params.append('filename', fileName);
 
-            const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/export_file`, {
+            const response = await (await import("../../lib/api")).default.get(`/api/export_file`, {
                 params: params,
                 headers: { Authorization: `Bearer ${(session as any)?.accessToken}` },
                 responseType: 'blob',
@@ -195,7 +204,7 @@ export default function DashboardPage() {
     };
 
     return (
-        <div className="min-h-screen bg-[#05070a] dark:bg-[#030407] text-slate-100 antialiased font-sans">
+        <div className="min-h-screen bg-white dark:bg-[#030407] text-slate-900 dark:text-slate-100 antialiased font-sans transition-colors duration-300">
 
             {/* Header */}
             <header className="bg-white/50 dark:bg-[#080b11]/60 border-b border-slate-200/60 dark:border-slate-900/60 px-4 sm:px-8 py-5 flex justify-between items-center sticky top-0 z-40 backdrop-blur-xl">
@@ -208,7 +217,6 @@ export default function DashboardPage() {
                         <span className="font-black text-lg bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-400 bg-clip-text text-transparent tracking-tight">
                             {t("logo")}
                         </span>
-                        <span className="text-[10px] text-indigo-400 dark:text-indigo-400/80 font-black tracking-widest uppercase">Market Intelligence</span>
                     </div>
                 </div>
 

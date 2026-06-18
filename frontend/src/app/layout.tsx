@@ -27,7 +27,6 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ar" dir="rtl" className={`${cairo.variable} ${jakarta.variable}`}>
-      {/* إضافة font-medium أو font-bold هنا تجعل النصوص العربية تظهر بسمك فخم ومريح للعين افتراضياً */}
       <body className="font-sans font-medium antialiased text-slate-900 dark:text-slate-100">
         <AuthProvider>
           <AppProvider>

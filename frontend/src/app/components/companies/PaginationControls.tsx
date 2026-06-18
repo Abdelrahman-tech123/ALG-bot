@@ -1,5 +1,6 @@
 "use client";
 import { ChevronRight, ChevronLeft } from "lucide-react";
+import { useApp } from "../../context/AppContext";
 
 interface PaginationControlsProps {
     currentPage: number;
@@ -8,6 +9,8 @@ interface PaginationControlsProps {
 }
 
 export default function PaginationControls({ currentPage, totalPages, onPageChange }: PaginationControlsProps) {
+    const { t } = useApp();
+
     if (totalPages <= 1) return null;
 
     return (
@@ -18,7 +21,7 @@ export default function PaginationControls({ currentPage, totalPages, onPageChan
                 className="p-2.5 rounded-xl bg-white dark:bg-[#080b10] border border-slate-200 dark:border-slate-900 text-slate-600 dark:text-slate-400 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-[#0f141c] transition-all font-black flex items-center gap-1 text-xs"
             >
                 <ChevronRight size={16} />
-                <span>السابق</span>
+                <span>{t("previous")}</span>
             </button>
 
             <div className="flex items-center gap-1.5">
@@ -56,7 +59,7 @@ export default function PaginationControls({ currentPage, totalPages, onPageChan
                 disabled={currentPage === totalPages}
                 className="p-2.5 rounded-xl bg-white dark:bg-[#080b10] border border-slate-200 dark:border-slate-900 text-slate-600 dark:text-slate-400 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 dark:hover:bg-[#0f141c] transition-all font-black flex items-center gap-1 text-xs"
             >
-                <span>التالي</span>
+                <span>{t("next")}</span>
                 <ChevronLeft size={16} />
             </button>
         </div>

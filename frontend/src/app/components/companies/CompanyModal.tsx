@@ -1,5 +1,6 @@
 "use client";
 import { X, Building2, Clock, MapPin, Phone, Mail, Globe, Compass } from "lucide-react";
+import { useApp } from "../../context/AppContext";
 
 interface Company {
     id: string;
@@ -22,7 +23,10 @@ interface CompanyModalProps {
 }
 
 export default function CompanyModal({ company, onClose }: CompanyModalProps) {
+    const { t } = useApp();
     if (!company) return null;
+
+    const processKeyword = (kw: string) => kw.replace(/\bin\b/gi, t("in"));
 
     return (
         <div
@@ -61,7 +65,7 @@ export default function CompanyModal({ company, onClose }: CompanyModalProps) {
                             </span>
                             {company.keyword && (
                                 <span className="px-2.5 py-0.5 rounded text-[10px] font-black bg-white/20 text-white backdrop-blur-sm">
-                                    #{company.keyword}
+                                    {processKeyword(company.keyword)}
                                 </span>
                             )}
                         </div>
@@ -70,7 +74,7 @@ export default function CompanyModal({ company, onClose }: CompanyModalProps) {
                 </div>
 
                 <div className="p-6 space-y-5 overflow-y-auto max-h-[60vh]">
-                    {company.open_times && (
+                    {/* {company.open_times && (
                         <div className="p-4 rounded-2xl bg-slate-50 dark:bg-[#0d1117] border border-slate-100 dark:border-slate-900 flex justify-between items-center">
                             <div className="text-sm font-extrabold text-slate-800 dark:text-slate-200">
                                 {typeof company.open_times === 'object'
@@ -78,14 +82,16 @@ export default function CompanyModal({ company, onClose }: CompanyModalProps) {
                                     : company.open_times}
                             </div>
                             <span className="text-sm font-black text-slate-500 dark:text-slate-400 flex items-center gap-2">
-                                مواعيد العمل
+                                {t("working_hours")}
                                 <Clock size={16} className="text-indigo-400" />
                             </span>
                         </div>
-                    )}
+                    )} */}
 
                     <div className="space-y-2">
-                        <span className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-1">البيانات التفصيلية</span>
+                        <span className="text-xs font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 block mb-1">
+                            {t("detailed_info")}
+                        </span>
 
                         {company.location && (
                             <div className="flex items-start gap-3 p-3.5 rounded-xl bg-slate-50/50 dark:bg-[#0d1117]/40 border border-slate-100 dark:border-slate-900">
@@ -112,7 +118,7 @@ export default function CompanyModal({ company, onClose }: CompanyModalProps) {
                             </div>
                         ) : (
                             <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-50/50 dark:bg-[#0d1117]/40 border border-slate-100 dark:border-slate-900 opacity-60">
-                                <div className="flex-1 text-sm text-slate-400 text-left italic font-bold">لا يوجد بريد إلكتروني</div>
+                                <div className="flex-1 text-sm text-slate-400 text-left italic font-bold">{t("no_email")}</div>
                                 <div className="text-slate-400"><Mail size={16} /></div>
                             </div>
                         )}
@@ -129,7 +135,7 @@ export default function CompanyModal({ company, onClose }: CompanyModalProps) {
                                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white font-black rounded-xl text-sm flex items-center gap-1.5 transition-all shadow-md shadow-indigo-600/10"
                             >
                                 <Globe size={15} />
-                                الموقع الإلكتروني
+                                {t("website")}
                             </a>
                         )}
                         {company.maps_link && (
@@ -140,7 +146,7 @@ export default function CompanyModal({ company, onClose }: CompanyModalProps) {
                                 className="px-5 py-2.5 bg-white hover:bg-slate-50 dark:bg-[#0d1117] dark:hover:bg-[#131a24] text-slate-800 dark:text-slate-200 border border-slate-200 dark:border-slate-900 font-black rounded-xl text-sm flex items-center gap-1.5 transition-all"
                             >
                                 <Compass size={15} className="text-red-500" />
-                                فتح في الخريطة
+                                {t("open_in_map")}
                             </a>
                         )}
                     </div>
@@ -149,7 +155,7 @@ export default function CompanyModal({ company, onClose }: CompanyModalProps) {
                         onClick={onClose}
                         className="px-4 py-2 text-slate-500 dark:text-slate-400 hover:text-slate-800 text-sm font-black transition-colors"
                     >
-                        إغلاق
+                        {t("close")}
                     </button>
                 </div>
             </div>

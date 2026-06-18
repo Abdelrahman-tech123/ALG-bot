@@ -1,5 +1,6 @@
 "use client";
 import { Calendar, MapPin, Globe, Compass, ExternalLink } from "lucide-react";
+import { useApp } from "../../context/AppContext";
 
 interface Company {
     id: string;
@@ -22,6 +23,8 @@ interface CompanyCardProps {
 }
 
 export default function CompanyCard({ company, onSelect }: CompanyCardProps) {
+    const { t } = useApp();
+
     const formatDate = (dateStr: string) => {
         if (!dateStr) return "";
         return new Date(dateStr).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' });
@@ -32,7 +35,6 @@ export default function CompanyCard({ company, onSelect }: CompanyCardProps) {
             onClick={() => onSelect(company)}
             className="bg-white dark:bg-[#080b10] border border-slate-200/60 dark:border-slate-900 rounded-2xl overflow-hidden shadow-sm hover:border-slate-300 dark:hover:border-slate-800 transition-all duration-300 cursor-pointer group flex flex-col justify-between relative h-[380px] transform hover:-translate-y-1"
         >
-            {/* Card Cover Header */}
             <div className="w-full h-36 relative overflow-hidden bg-slate-50 dark:bg-[#0c0f14] border-b border-slate-100 dark:border-slate-900">
                 {company.first_image ? (
                     <img
@@ -51,15 +53,15 @@ export default function CompanyCard({ company, onSelect }: CompanyCardProps) {
 
                 <div className="absolute top-3 left-3 right-3 flex justify-between items-center pointer-events-none">
                     <span className={`px-2.5 py-0.5 rounded-md text-[10px] font-black tracking-wider uppercase backdrop-blur-md border ${company.source === "Google Maps"
-                            ? "bg-blue-600/90 text-white border-blue-400/30"
-                            : "bg-cyan-600/90 text-white border-cyan-400/30"
+                        ? "bg-blue-600/90 text-white border-blue-400/30"
+                        : "bg-cyan-600/90 text-white border-cyan-400/30"
                         }`}>
                         {company.source}
                     </span>
 
                     {company.keyword && (
                         <span className="px-2.5 py-0.5 rounded-md text-[10px] font-black bg-slate-900/80 text-slate-200 border border-slate-800/50 backdrop-blur-sm max-w-[150px] truncate">
-                            #{company.keyword}
+                            {company.keyword.replace(/\bin\b/gi, t("in"))}
                         </span>
                     )}
                 </div>
@@ -70,7 +72,6 @@ export default function CompanyCard({ company, onSelect }: CompanyCardProps) {
                 </div>
             </div>
 
-            {/* Core Card Info */}
             <div className="p-5 flex flex-col justify-between flex-1 text-right">
                 <div className="space-y-2">
                     <h4 className="font-black text-base text-slate-900 dark:text-white line-clamp-1 group-hover:text-indigo-500 dark:group-hover:text-indigo-400 transition-colors">
@@ -83,25 +84,23 @@ export default function CompanyCard({ company, onSelect }: CompanyCardProps) {
                             <MapPin size={13} className="shrink-0 text-slate-400" />
                         </p>
                     ) : (
-                        <p className="text-xs text-slate-400 dark:text-slate-600 italic font-bold">العنوان غير محدد</p>
+                        <p className="text-xs text-slate-400 dark:text-slate-600 italic font-bold">{t("location_undefined")}</p>
                     )}
                 </div>
 
-                {/* Contact Matrix */}
                 <div className="py-3 my-2 border-y border-slate-100 dark:border-slate-900/60 space-y-2.5 text-xs font-extrabold text-slate-700 dark:text-slate-300">
                     <div className="flex justify-between items-center">
                         <span className="font-black text-slate-900 dark:text-white tracking-wide text-sm">{company.phone || "—"}</span>
-                        <span className="text-slate-400 dark:text-slate-500 font-black">الهاتف</span>
+                        <span className="text-slate-400 dark:text-slate-500 font-black">{t("phone")}</span>
                     </div>
                     <div className="flex justify-between items-center">
                         <span className="truncate max-w-[160px] text-left font-bold text-slate-500 dark:text-slate-400 text-sm">
                             {company.email && company.email.length > 0 ? company.email[0] : "—"}
                         </span>
-                        <span className="text-slate-400 dark:text-slate-500 font-black">البريد الإلكتروني</span>
+                        <span className="text-slate-400 dark:text-slate-500 font-black">{t("email")}</span>
                     </div>
                 </div>
 
-                {/* Links */}
                 <div className="flex items-center justify-between pt-1" onClick={(e) => e.stopPropagation()}>
                     {company.website ? (
                         <a
@@ -111,11 +110,11 @@ export default function CompanyCard({ company, onSelect }: CompanyCardProps) {
                             className="text-xs text-indigo-500 dark:text-indigo-400 font-black inline-flex items-center gap-1 hover:text-indigo-600 dark:hover:text-indigo-300 group/link"
                         >
                             <Globe size={13} />
-                            الموقع الإلكتروني
+                            {t("website")}
                             <ExternalLink size={11} className="opacity-0 group-hover/link:opacity-100 transition-opacity" />
                         </a>
                     ) : (
-                        <span className="text-xs text-slate-300 dark:text-slate-700 font-bold">لا يوجد موقع</span>
+                        <span className="text-xs text-slate-300 dark:text-slate-700 font-bold">{t("no_website")}</span>
                     )}
 
                     {company.maps_link && (
@@ -126,7 +125,7 @@ export default function CompanyCard({ company, onSelect }: CompanyCardProps) {
                             className="text-xs text-slate-500 dark:text-slate-400 hover:text-red-500 dark:hover:text-red-400 font-black flex items-center gap-1 transition-colors"
                         >
                             <Compass size={13} />
-                            الخريطة
+                            {t("map")}
                         </a>
                     )}
                 </div>
