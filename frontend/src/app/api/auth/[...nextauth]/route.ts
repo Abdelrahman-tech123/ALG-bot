@@ -12,31 +12,43 @@ export const authOptions: NextAuthOptions = {
             },
             async authorize(credentials) {
                 try {
+                    // إذا كان الـ FastAPI عندك في الـ Login بياخد (email و password) كـ JSON عادي:
                     const response = await axios.post(
-                        `${process.env.NEXT_PUBLIC_API_URL}/api/auth/token`,
+                        `${process.env.NEXT_PUBLIC_API_URL}/api/auth/login`,
                         {
-                            username: credentials?.email || "",
-                            password: credentials?.password || "",
+                            email: credentials?.email || "",
+                            password: credentials?.password || ""
                         },
                         {
-                            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                            headers: { "Content-Type": "application/json" },
                         }
                     );
 
+                    // backend returns { access_token, token_type, user }
                     const data = response.data;
 
-                    if (response.status === 200 && data.access_token) {
-                        return {
-                            id: data.user_id,
-                            email: credentials?.email,
-                            name: data.user_name,
-                            accessToken: data.access_token,
-                        };
+                    if (!data) {
+                        console.error("Empty response from API login", response);
+                        return null;
                     }
-                    return null;
-                } catch (error) {
-                    // في حال حدوث خطأ من الباك إند (مثل 401 أو 400)
-                    console.error("Auth Error:", error);
+
+                    const accessToken = data.access_token;
+                    const user = data.user;
+
+                    if (!accessToken || !user) {
+                        console.error("Unexpected login response shape", data);
+                        return null;
+                    }
+
+                    return {
+                        id: user.id as any || user.user_id || "1",
+                        name: user.name || user.username || "User",
+                        email: user.email || credentials?.email,
+                        accessToken: accessToken,
+                    };
+                } catch (error: any) {
+                    // السطر ده هيطبعلك في ترمنال الـ Next.js الـ 422 دي سببها إيه بالظبط من الـ FastAPI
+                    console.error("FastAPI Validation Error Details:", error.response?.data?.detail);
                     return null;
                 }
             }

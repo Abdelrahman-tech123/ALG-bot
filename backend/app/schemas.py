@@ -45,6 +45,10 @@ class ScrapeRequest(BaseModel):
     source: Optional[str] = "Google Maps" 
     max_results : int
 
+class GetCompanies(BaseModel):
+    place : Optional[str] = None
+    location : Optional[str] = None
+
 class CompanyResponse(BaseModel):
     id: uuid.UUID # 👈 حتى الشركات بقت UUID عشان الـ URLs في الفرونت إند تكون مشفرة وصعبة التخمين
     keyword : Optional[str] = None

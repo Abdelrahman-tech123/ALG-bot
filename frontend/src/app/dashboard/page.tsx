@@ -1,200 +1,298 @@
 "use client";
 import { useSession, signOut } from "next-auth/react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { useApp } from "../context/AppContext";
 import NavbarControls from "../components/NavbarControls";
-import { Search, Download, RefreshCw, Cpu, LogOut, Globe, AlertCircle } from "lucide-react";
-
-interface Company {
-    id: string;
-    source: string;
-    company_name: string;
-    phone: string | null;
-    email: string | null;
-    website: string | null;
-    location: string | null;
-}
+import CompanyCard from "../components/companies/CompanyCard";
+import CompanyModal from "../components/companies/CompanyModal";
+import PaginationControls from "../components/companies/PaginationControls";
+import { Search, Download, RefreshCw, Cpu, LogOut, AlertCircle, Layers, ArrowUpRight, X } from "lucide-react";
 
 export default function DashboardPage() {
     const { t } = useApp();
     const { data: session, status } = useSession();
     const router = useRouter();
 
-    const [keyword, setKeyword] = useState("");
-    const [location, setLocation] = useState("");
-    const [source, setSource] = useState("Google Maps");
+    const [currentPage, setCurrentPage] = useState(1);
+    const [companies, setCompanies] = useState<any[]>([]);
+    const [totalItems, setTotalItems] = useState(0);
+    const [activePlace, setActivePlace] = useState("");
+    const [activeLocation, setActiveLocation] = useState("");
     const [scraping, setScraping] = useState(false);
-    const [companies, setCompanies] = useState<Company[]>([]);
-    const [searchFilter, setSearchFilter] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [keywordInput, setKeywordInput] = useState("");
+    const [locationInput, setLocationInput] = useState("");
+    const [source, setSource] = useState("Google Maps");
+    const [maxResults, setMaxResults] = useState(20);
+    const [selectedCompany, setSelectedCompany] = useState<any | null>(null);
 
-    useEffect(() => {
-        if (status === "unauthenticated") {
-            router.push("/login");
-        } else if (status === "authenticated") {
-            fetchCompanies();
-        }
-    }, [status]);
+    const ITEMS_PER_PAGE = 12;
 
-    const fetchCompanies = async () => {
+    const fetchCompanies = useCallback(async (limit: number, isNewSearch = false) => {
+        if (status !== "authenticated") return;
+
         try {
             const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/companies`, {
+                params: {
+                    place: activePlace || undefined,
+                    location: activeLocation || undefined,
+                    limit: limit,
+                },
                 headers: { Authorization: `Bearer ${(session as any)?.accessToken}` },
             });
-            setCompanies(response.data);
+
+            const newCompanies = response.data.companies || [];
+
+            setCompanies(prev => {
+                if (isNewSearch) return newCompanies;
+                // حماية ضد التكرار: ندمج البيانات الجديدة فقط
+                const existingIds = new Set(prev.map(c => c.id));
+                const uniqueNew = newCompanies.filter((c: any) => !existingIds.has(c.id));
+                return [...prev, ...uniqueNew];
+            });
+
+            setTotalItems(response.data.total_items);
+            const uniqueKeywords = [... new Set(companies.map(c => c.keyword))].filter(Boolean);
+            console.log("Unique Keywords in Current Data:", uniqueKeywords);
         } catch (err) {
-            console.error(err);
+            console.error("Error fetching companies:", err);
         }
-    };
+    }, [status, activePlace, activeLocation, session]);
+
+    useEffect(() => {
+        const threshold = 3;
+        const itemsCurrentlyVisible = currentPage * ITEMS_PER_PAGE;
+        const itemsFetched = companies.length;
+
+        if (itemsCurrentlyVisible >= itemsFetched - (threshold * ITEMS_PER_PAGE)) {
+            if (itemsFetched < totalItems && !scraping) {
+                fetchCompanies(itemsFetched + 100, false);
+            }
+        }
+    }, [currentPage, companies, totalItems, scraping, fetchCompanies]);
+
+    useEffect(() => {
+        if (status === "authenticated" && companies.length === 0) {
+            fetchCompanies(100, true);
+        } else if (status === "unauthenticated") {
+            router.push("/login");
+        }
+        // قمنا بإزالة fetchCompanies من الـ Dependency Array
+        // وأضفنا شرط companies.length === 0 لضمان التحميل مرة واحدة فقط
+    }, [status, router]);
+
+    const filteredCompanies = useMemo(() => {
+        if (!searchQuery.trim()) return companies;
+
+        const query = searchQuery.toLowerCase().trim();
+        // الحصول على كلمة "in" المترجمة من ملف الإعدادات لديك
+        const inWord = t("in").toLowerCase();
+
+        return companies.filter(c => {
+            const name = c.company_name?.toLowerCase() || "";
+            const loc = c.location?.toLowerCase() || "";
+            const phone = c.phone?.toLowerCase() || "";
+            const keyword = c.keyword?.toLowerCase() || "";
+
+            // التحقق من وجود كلمة in المترجمة أو الأصلية في الموقع
+            const locMatches = loc.includes(query) || loc.includes(`${query} ${inWord}`) || loc.includes(`${inWord} ${query}`);
+
+            return (
+                name.includes(query) ||
+                locMatches ||
+                phone.includes(query) ||
+                keyword.includes(query)
+            );
+        });
+    }, [companies, searchQuery, t]);
+
+    const dynamicTotalPages = useMemo(() => Math.max(1, Math.ceil(filteredCompanies.length / ITEMS_PER_PAGE)), [filteredCompanies]);
+
+    const paginatedCompanies = useMemo(() => {
+        const start = (currentPage - 1) * ITEMS_PER_PAGE;
+        return filteredCompanies.slice(start, start + ITEMS_PER_PAGE);
+    }, [filteredCompanies, currentPage]);
 
     const handleStartScrape = async (e: React.FormEvent) => {
         e.preventDefault();
         setScraping(true);
         try {
-            const response = await axios.post(
-                `${process.env.NEXT_PUBLIC_API_URL}/api/scrape/start`,
-                { keyword, location, source },
-                { headers: { Authorization: `Bearer ${(session as any)?.accessToken}` } }
-            );
-            if (response.status === 200 || response.status === 202) {
-                alert(t("scrape_success"));
-            }
-        } catch (err) {
-            alert("Error initiating scraper.");
-        } finally {
-            setScraping(false);
+            await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/api/scrape/run`, {
+                keyword: keywordInput,
+                location: locationInput,
+                source,
+                max_results: Number(maxResults)
+            }, { headers: { Authorization: `Bearer ${(session as any)?.accessToken}` } });
+
+            // التحديث هنا هو الأهم
+            setActivePlace(keywordInput);
+            setActiveLocation(locationInput);
+            setCurrentPage(1);
+            // لا تستدعِ fetchCompanies هنا، الـ useEffect القادم سيتولى الأمر
+        } catch (err) { console.error(err); } finally { setScraping(false); }
+    };
+
+    // 2. هذا الـ Effect يضمن جلب داتا البحث الجديد فقط بمجرد تغير الـ activePlace
+    useEffect(() => {
+        if (activePlace && activeLocation) {
+            fetchCompanies(100, true); // true تعني "isNewSearch" ليمسح الداتا القديمة
         }
+    }, [activePlace, activeLocation]);
+
+    const handleClearAllFilters = () => {
+        if (scraping) return;
+        setKeywordInput("");
+        setLocationInput("");
+        setSearchQuery("");
+        setActivePlace("");
+        setActiveLocation("");
+        setCurrentPage(1);
+        fetchCompanies(100, true);
     };
-
-    const handleExportExcel = async () => {
-        window.open(`${process.env.NEXT_PUBLIC_API_URL}/api/companies/export?token=${(session as any)?.accessToken}`, "_blank");
-    };
-
-    const filteredCompanies = companies.filter(c =>
-        c.company_name.toLowerCase().includes(searchFilter.toLowerCase()) ||
-        (c.location && c.location.toLowerCase().includes(searchFilter.toLowerCase()))
-    );
-
-    if (status === "loading") return <div className="min-h-screen bg-slate-50 dark:bg-black flex items-center justify-center text-slate-400 dark:text-slate-600 font-medium text-xs">Loading Dashboard...</div>;
 
     return (
-        <div className="min-h-screen bg-slate-50 dark:bg-black text-slate-900 dark:text-slate-100 transition-colors duration-300">
-            {/* هيدر Vercel النظيف */}
-            <header className="bg-white dark:bg-black border-b border-slate-200 dark:border-slate-900 px-6 py-3.5 flex justify-between items-center sticky top-0 z-50 backdrop-blur-md bg-white/80 dark:bg-black/80">
+        <div className="min-h-screen bg-[#05070a] dark:bg-[#030407] text-slate-100 antialiased font-sans">
+
+            {/* Header */}
+            <header className="bg-white/50 dark:bg-[#080b11]/60 border-b border-slate-200/60 dark:border-slate-900/60 px-4 sm:px-8 py-5 flex justify-between items-center sticky top-0 z-40 backdrop-blur-xl">
                 <div className="flex items-center gap-3">
-                    <span className="font-bold text-md tracking-tight text-slate-950 dark:text-white">{t("logo")}</span>
+                    <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center shadow-lg shadow-indigo-500/20 relative group">
+                        <div className="absolute inset-0 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-xl blur-md opacity-40 group-hover:opacity-70 transition-opacity" />
+                        <Layers size={18} className="text-white relative z-10" />
+                    </div>
+                    <div className="flex flex-col text-right">
+                        <span className="font-black text-lg bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-400 bg-clip-text text-transparent tracking-tight">
+                            {t("logo")}
+                        </span>
+                        <span className="text-[10px] text-indigo-400 dark:text-indigo-400/80 font-black tracking-widest uppercase">Market Intelligence</span>
+                    </div>
                 </div>
+
                 <div className="flex items-center gap-4">
-                    <div className="hidden sm:flex flex-col text-right">
-                        <span className="text-[10px] uppercase tracking-wider text-slate-400">{t("welcome")}</span>
-                        <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">{session?.user?.name}</span>
+                    <div className="hidden md:flex flex-col text-right">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500">{t("welcome")}</span>
+                        <span className="text-sm font-black text-slate-800 dark:text-slate-200">{session?.user?.name}</span>
                     </div>
                     <NavbarControls />
-                    <button onClick={() => signOut()} className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-800/60 transition-all flex items-center gap-1.5 text-xs font-medium">
-                        <LogOut size={14} />
-                        <span className="hidden md:inline">{t("logout")}</span>
+                    <button
+                        onClick={() => signOut()}
+                        disabled={scraping}
+                        className="p-3 rounded-xl bg-white hover:bg-slate-50 dark:bg-[#0e1217] dark:hover:bg-[#131920] text-slate-600 dark:text-slate-400 border border-slate-200/80 dark:border-slate-900 transition-all flex items-center gap-2 text-sm font-black shadow-sm group hover:border-rose-500/30 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                        <LogOut size={15} className="text-rose-500 group-hover:translate-x-0.5 transition-transform" />
+                        <span className="hidden sm:inline text-slate-700 dark:text-slate-300">{t("logout")}</span>
                     </button>
                 </div>
             </header>
 
-            <main className="p-6 max-w-7xl mx-auto space-y-6">
-                {/* لوحة التحكم */}
-                <section className="bg-white dark:bg-slate-900/30 border border-slate-200 dark:border-slate-900 rounded-xl p-6 shadow-sm transition-colors">
-                    <h3 className="text-xs uppercase tracking-wider font-bold text-slate-400 dark:text-slate-500 mb-4 flex items-center gap-2">
-                        <Cpu size={14} />
-                        {t("control_panel")}
-                    </h3>
-                    <form onSubmit={handleStartScrape} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">{t("keyword_label")}</label>
-                            <input type="text" value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder={t("keyword_placeholder")} required className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-800 text-slate-900 dark:text-white" />
+            <main className="p-4 sm:p-8 max-w-7xl mx-auto space-y-10">
+
+                {/* Control Panel (Scraper) */}
+                <section className={`bg-white dark:bg-[#080b10] border border-slate-200/60 dark:border-slate-900/60 rounded-3xl p-6 relative overflow-hidden shadow-xl shadow-slate-100/50 dark:shadow-none transition-all ${scraping ? "opacity-75" : ""}`}>
+                    <div className="absolute top-0 left-0 w-full h-[2px] bg-gradient-to-r from-indigo-500 via-purple-500 via-pink-500 to-cyan-500" />
+                    <div className="flex items-center justify-between mb-6">
+                        <h3 className="text-sm uppercase tracking-widest font-black bg-gradient-to-r from-indigo-500 to-purple-500 dark:from-indigo-400 dark:to-purple-400 bg-clip-text text-transparent flex items-center gap-2">
+                            <Cpu size={16} className={scraping ? "animate-spin text-indigo-500" : "text-indigo-400"} />
+                            {t("control_panel")} {scraping && <span className="text-xs text-amber-500 animate-pulse">({t("running_engine_status")})</span>}
+                        </h3>
+                    </div>
+
+                    <form onSubmit={handleStartScrape} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-5 items-end">
+                        <div className="space-y-2">
+                            <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("keyword_label")}</label>
+                            <input type="text" value={keywordInput} onChange={(e) => setKeywordInput(e.target.value)} placeholder={t("keyword_placeholder")} required disabled={scraping} className="w-full bg-slate-50 dark:bg-[#0d1117] border border-slate-200/80 dark:border-slate-900 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed font-extrabold" />
                         </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">{t("location_label")}</label>
-                            <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder={t("location_placeholder")} required className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-800 text-slate-900 dark:text-white" />
+                        <div className="space-y-2">
+                            <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("location_label")}</label>
+                            <input type="text" value={locationInput} onChange={(e) => setLocationInput(e.target.value)} placeholder={t("location_placeholder")} required disabled={scraping} className="w-full bg-slate-50 dark:bg-[#0d1117] border border-slate-200/80 dark:border-slate-900 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed font-extrabold" />
                         </div>
-                        <div>
-                            <label className="block text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2">{t("platform_label")}</label>
-                            <select value={source} onChange={(e) => setSource(e.target.value)} className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3 py-2 text-xs focus:outline-none focus:ring-1 focus:ring-slate-400 dark:focus:ring-slate-800 text-slate-900 dark:text-white">
-                                <option value="Google Maps">Google Maps</option>
-                                <option value="LinkedIn">LinkedIn</option>
+                        <div className="space-y-2">
+                            <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("platform_label")}</label>
+                            <select value={source} onChange={(e) => setSource(e.target.value)} disabled={scraping} className="w-full bg-slate-50 dark:bg-[#0d1117] border border-slate-200/80 dark:border-slate-900 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-black">
+                                <option value="Google Maps">Google Maps 📍</option>
+                                <option value="LinkedIn">LinkedIn 💼</option>
                             </select>
                         </div>
-                        <button type="submit" disabled={scraping} className="w-full bg-slate-950 hover:bg-slate-900 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-black font-semibold py-2 rounded-xl text-xs transition-all border border-slate-950 dark:border-white shadow-sm">
-                            {scraping ? t("running_engine") : t("start_scrape")}
+                        <div className="space-y-2">
+                            <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("max_results_label")}</label>
+                            <input type="number" min="1" max="500" value={maxResults} onChange={(e) => setMaxResults(Math.max(1, parseInt(e.target.value) || 0))} required disabled={scraping} className="w-full bg-slate-50 dark:bg-[#0d1117] border border-slate-200/80 dark:border-slate-900 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed font-black" />
+                        </div>
+                        <button type="submit" disabled={scraping} className="w-full relative group overflow-hidden bg-slate-950 dark:bg-white text-white dark:text-black font-black py-3.5 rounded-xl text-sm transition-all active:scale-[0.99] h-[52px] shadow-lg shadow-indigo-500/5 disabled:opacity-50 disabled:cursor-not-allowed">
+                            <div className="absolute inset-0 bg-gradient-to-r from-indigo-500 to-purple-500 opacity-0 group-hover:opacity-10 dark:group-hover:opacity-5 transition-opacity" />
+                            {scraping ? (
+                                <span className="flex items-center justify-center gap-2"><RefreshCw size={15} className="animate-spin" /> {t("running_engine")}</span>
+                            ) : (
+                                <span className="flex items-center justify-center gap-1.5 tracking-wide">{t("start_scrape")} <ArrowUpRight size={16} /></span>
+                            )}
                         </button>
                     </form>
                 </section>
 
-                {/* الجدول */}
-                <section className="bg-white dark:bg-slate-900/10 border border-slate-200 dark:border-slate-900 rounded-xl shadow-sm overflow-hidden transition-colors">
-                    <div className="p-6 border-b border-slate-200 dark:border-slate-900 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+                {/* Filter Hub */}
+                <div className="space-y-6">
+                    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4 bg-white/40 dark:bg-[#080b10]/40 p-5 rounded-2xl border border-slate-200/40 dark:border-slate-900/40 backdrop-blur-md">
                         <div>
-                            <h3 className="text-sm font-bold text-slate-950 dark:text-white">{t("my_data")}</h3>
-                            <p className="text-xs text-slate-400 dark:text-slate-500 mt-0.5">{t("data_subtitle")}</p>
-                        </div>
-                        <div className="flex flex-wrap gap-2 w-full lg:w-auto">
-                            <div className="relative flex-1 sm:flex-none">
-                                <Search className="absolute top-2.5 px-1 text-slate-400 left-2.5" size={14} />
-                                <input type="text" value={searchFilter} onChange={(e) => setSearchFilter(e.target.value)} placeholder={t("search_placeholder")} className="bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-slate-900 dark:text-white focus:outline-none w-full sm:w-56" />
+                            <div className="flex flex-wrap items-center gap-2">
+                                <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">{t("my_data")}</h3>
+                                {(activePlace || activeLocation) && (
+                                    <span className="px-3 py-1 text-xs font-black bg-indigo-500/10 text-indigo-500 border border-indigo-500/20 rounded-xl flex items-center gap-1.5">
+                                        {t("filter_label")}: {activePlace} {activeLocation ? `${t("in")} ${activeLocation}` : ""}
+                                        <X size={12} className={`cursor-pointer hover:text-red-500 ${scraping ? "pointer-events-none opacity-30" : ""}`} onClick={() => { if (!scraping) { setActivePlace(""); setActiveLocation(""); setCurrentPage(1); } }} />
+                                    </span>
+                                )}
+                                {searchQuery && (
+                                    <span className="px-3 py-1 text-xs font-black bg-purple-500/10 text-purple-500 border border-purple-500/20 rounded-xl flex items-center gap-1.5">
+                                        {t("search_match")}: "{searchQuery}"
+                                        <X size={12} className={`cursor-pointer hover:text-red-500 ${scraping ? "pointer-events-none opacity-30" : ""}`} onClick={() => { if (!scraping) setSearchQuery(""); }} />
+                                    </span>
+                                )}
                             </div>
-                            <button onClick={handleExportExcel} className="bg-slate-950 hover:bg-slate-900 dark:bg-white dark:hover:bg-slate-100 text-white dark:text-black text-xs font-semibold px-4 py-1.5 rounded-xl transition-all flex items-center gap-1.5 border border-slate-950 dark:border-white">
-                                <Download size={14} />
-                                <span>{t("export_btn")}</span>
-                            </button>
-                            <button onClick={fetchCompanies} className="bg-slate-50 dark:bg-slate-950 text-slate-700 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-900 p-2 rounded-xl border border-slate-200 dark:border-slate-800 transition-all">
-                                <RefreshCw size={14} />
-                            </button>
+                            <p className="text-sm text-slate-400 dark:text-slate-500 mt-1 font-bold">
+                                {t("results_found")}: <span className="text-indigo-500 dark:text-indigo-400 font-black">{filteredCompanies.length}</span> {t("of")} {totalItems}
+                            </p>
+                        </div>
+
+                        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 w-full lg:w-auto">
+                            <div className="relative flex-1 sm:flex-none">
+                                <Search className="absolute left-3.5 top-4 text-slate-400 dark:text-slate-600" size={15} />
+                                <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={t("search_placeholder")} disabled={scraping} className="bg-white dark:bg-[#0d1117] border border-slate-200 dark:border-slate-900 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none w-full sm:w-80 transition-all focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-extrabold disabled:opacity-50 disabled:cursor-not-allowed" />
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => console.log("exporting ...")} disabled={scraping || companies.length === 0} className="flex-1 sm:flex-none bg-white hover:bg-slate-50 dark:bg-[#0d1117] dark:hover:bg-[#12161f] text-slate-800 dark:text-slate-200 text-sm font-black px-5 py-3 rounded-xl transition-all flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-900 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                                    <Download size={15} className="text-emerald-500" /> <span>{t("export_btn")}</span>
+                                </button>
+                                <button onClick={handleClearAllFilters} disabled={scraping} className="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-black px-5 py-3 rounded-xl transition-all shadow-lg shadow-indigo-600/10 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
+                                    {t("all_data")}
+                                </button>
+                            </div>
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-right text-xs">
-                            <thead className="bg-slate-50 dark:bg-slate-950/60 text-slate-400 dark:text-slate-500 text-[11px] font-bold uppercase border-b border-slate-200 dark:border-slate-900">
-                                <tr>
-                                    <th className="px-6 py-3">{t("th_platform")}</th>
-                                    <th className="px-6 py-3">{t("th_name")}</th>
-                                    <th className="px-6 py-3">{t("th_phone")}</th>
-                                    <th className="px-6 py-3">{t("th_email")}</th>
-                                    <th className="px-6 py-3">{t("th_web")}</th>
-                                    <th className="px-6 py-3">{t("th_address")}</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-100 dark:divide-slate-900">
-                                {filteredCompanies.length > 0 ? (
-                                    filteredCompanies.map((company) => (
-                                        <tr key={company.id} className="hover:bg-slate-50/40 dark:hover:bg-slate-900/30 transition-colors">
-                                            <td className="px-6 py-3.5"><span className={`px-2 py-0.5 rounded text-[10px] font-bold border ${company.source === "Google Maps" ? "bg-blue-50/50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 border-blue-100 dark:border-blue-900/30" : "bg-sky-50 dark:bg-sky-950/20 text-sky-600 dark:text-sky-400 border-sky-100 dark:border-sky-900/30"}`}>{company.source}</span></td>
-                                            <td className="px-6 py-3.5 font-bold text-slate-950 dark:text-white">{company.company_name}</td>
-                                            <td className="px-6 py-3.5 text-slate-600 dark:text-slate-400 font-medium">{company.phone || "—"}</td>
-                                            <td className="px-6 py-3.5 text-slate-600 dark:text-slate-400">{company.email || "—"}</td>
-                                            <td className="px-6 py-3.5">
-                                                {company.website ? (
-                                                    <a href={company.website} target="_blank" rel="noreferrer" className="text-slate-900 dark:text-slate-300 hover:underline inline-flex items-center gap-1 font-medium">
-                                                        <Globe size={12} />
-                                                        <span className="max-w-[140px] truncate">{company.website}</span>
-                                                    </a>
-                                                ) : "—"}
-                                            </td>
-                                            <td className="px-6 py-3.5 text-slate-400 dark:text-slate-500 text-[11px] max-w-xs truncate">{company.location || "—"}</td>
-                                        </tr>
-                                    ))
-                                ) : (
-                                    <tr>
-                                        <td colSpan={6} className="text-center py-20 text-slate-400">
-                                            <div className="flex flex-col items-center justify-center gap-2">
-                                                <AlertCircle size={20} className="text-slate-300 dark:text-slate-800" />
-                                                <p className="max-w-md text-[11px] text-slate-400 dark:text-slate-600">{t("no_data")}</p>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </div>
-                </section>
+                    {paginatedCompanies.length > 0 ? (
+                        <div className="space-y-10">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {paginatedCompanies.map((company) => (
+                                    <CompanyCard key={company.id} company={company} onSelect={setSelectedCompany} />
+                                ))}
+                            </div>
+                            <PaginationControls currentPage={currentPage} totalPages={dynamicTotalPages} onPageChange={(page) => { if (!scraping) setCurrentPage(page); }} />
+                        </div>
+                    ) : (
+                        <div className="bg-white dark:bg-[#080b10] border border-slate-200 dark:border-slate-900 rounded-3xl py-24 text-center">
+                            <div className="flex flex-col items-center justify-center max-w-sm mx-auto gap-3">
+                                <div className="w-14 h-14 rounded-2xl bg-slate-50 dark:bg-[#0d1117] border border-slate-200 dark:border-slate-900 flex items-center justify-center text-slate-400">
+                                    <AlertCircle size={24} />
+                                </div>
+                                <p className="text-sm font-black text-slate-400 dark:text-slate-500">{t("no_data_found")}</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </main>
+
+            <CompanyModal company={selectedCompany} onClose={() => setSelectedCompany(null)} />
         </div>
     );
 }

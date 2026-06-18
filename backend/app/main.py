@@ -12,7 +12,7 @@ os.environ['TOKENIZERS_PARALLELISM'] = 'false'
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base
-from app.routers import auth_routes, scrape_routes
+from app.routers import auth_routes, scrape_routes , companies_routes
 from app.config import settings
 
 # Initialize the FastAPI app
@@ -37,6 +37,7 @@ app.add_middleware(
 
 app.include_router(auth_routes.router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(scrape_routes.router , prefix="/api/scrape" , tags=["Scraper"])
+app.include_router(companies_routes.router , prefix="/api/companies" , tags=["Companies"])
 
 @app.get("/", tags=["Root"])
 def read_root():
