@@ -17,9 +17,10 @@ from pathlib import Path
 
 import uvicorn
 
+# عدل هذه الأسطر في بداية run.py
 BASE_DIR = Path(__file__).resolve().parent
-HOST = "127.0.0.1"
-PORT = 8000
+HOST = "0.0.0.0" # هام جداً: هذا يسمح للـ Docker بالاتصال بالخارج
+PORT = int(os.environ.get("PORT", 8000)) # Render يحدد الـ PORT تلقائياً
 
 
 def configure_environment() -> None:
