@@ -14,7 +14,6 @@ interface AppContextType {
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
-// قاموس الترجمة الداخلي لجميع الصفحات
 const translations = {
     ar: {
         logo: "🌐 جامع البيانات الذكي",
@@ -36,11 +35,13 @@ const translations = {
         welcome: "مرحباً بك،",
         logout: "تسجيل الخروج",
         control_panel: "🤖 لوحة التحكم في محرك الكشط",
+        running_engine_status: "المحرك يعمل",
         keyword_label: "الكلمة المفتاحية (Keyword)",
         keyword_placeholder: "مثال: مطاعم، شركات شحن",
         location_label: "الموقع الجغرافي (Location)",
         location_placeholder: "مثال: القاهرة، جدة",
         platform_label: "المنصة المستهدفة",
+        max_results_label: "الحد الأقصى للنتائج",
         start_scrape: "ابدأ استخراج البيانات",
         running_engine: "جاري تشغيل المحرك...",
         my_data: "📊 بياناتي المستخرجة",
@@ -48,13 +49,13 @@ const translations = {
         search_placeholder: "ابحث فورياً في هذه الصفحة...",
         export_btn: "تصدير Excel",
         refresh: "تحديث",
-        no_data: "لا توجد نتائج تطابق بحثك الحالي.",
+        no_data_found: "لا توجد نتائج تطابق بحثك الحالي.",
         error_auth: "إيميل أو كلمة مرور خاطئة.",
         scrape_success: "🚀 تم بدء عملية الاستخراج بنجاح!",
         all_data: "كل البيانات",
         max_results: "الحد الأقصى للنتائج",
         in: "في",
-        filter_label: "تصفية السكراب",
+        filter_label: "تصفية",
         search_match: "مطابقة البحث لـ",
         results_found: "العناصر المكتشفة بالبحث",
         of: "من أصل",
@@ -79,11 +80,13 @@ const translations = {
         welcome: "Welcome,",
         logout: "Sign Out",
         control_panel: "🤖 Scraper Engine Control Panel",
+        running_engine_status: "Engine running",
         keyword_label: "Keyword",
         keyword_placeholder: "e.g., restaurants, tech companies",
         location_label: "Location",
         location_placeholder: "e.g., Cairo, Dubai",
         platform_label: "Target Platform",
+        max_results_label: "Max results",
         start_scrape: "Start Scraping",
         running_engine: "Running engine...",
         my_data: "📊 Your Extracted Data",
@@ -91,15 +94,15 @@ const translations = {
         search_placeholder: "Search results...",
         export_btn: "Export Excel",
         refresh: "Refresh",
-        no_data: "No results match your current search.",
+        no_data_found: "No results match your current search.",
         error_auth: "Invalid email or password.",
         scrape_success: "🚀 Scraping process started successfully!",
         all_data: "all data",
         max_results: "Max results",
         in: "in",
-        filter_label: "filtering label",
-        search_match: "search match",
-        results_found: "result found",
+        filter_label: "Filter",
+        search_match: "Search matches",
+        results_found: "Result found",
         of: "of",
     }
 };
@@ -108,27 +111,19 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     const [theme, setTheme] = useState<Theme>("dark");
     const [lang, setLang] = useState<Lang>("ar");
 
-    // تبديل الكلاسات على عنصر الـ HTML لتفعيل الـ Dark Mode الخاص بـ Tailwind
     useEffect(() => {
         const root = window.document.documentElement;
-        if (theme === "dark") {
-            root.classList.add("dark");
-        } else {
-            root.classList.remove("dark");
-        }
+        if (theme === "dark") root.classList.add("dark");
+        else root.classList.remove("dark");
     }, [theme]);
 
     const toggleTheme = () => setTheme((prev) => (prev === "dark" ? "light" : "dark"));
 
-    const t = (key: string) => {
-        return (translations[lang] as any)[key] || key;
-    };
+    const t = (key: string) => (translations[lang] as any)[key] || key;
 
     return (
         <AppContext.Provider value={{ theme, lang, toggleTheme, setLang, t }}>
-            <div dir={lang === "ar" ? "rtl" : "ltr"} className={lang === "ar" ? "font-sans" : "font-sans"}>
-                {children}
-            </div>
+            <div dir={lang === "ar" ? "rtl" : "ltr"}>{children}</div>
         </AppContext.Provider>
     );
 }

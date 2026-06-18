@@ -8,6 +8,7 @@ import NavbarControls from "../components/NavbarControls";
 import CompanyCard from "../components/companies/CompanyCard";
 import CompanyModal from "../components/companies/CompanyModal";
 import PaginationControls from "../components/companies/PaginationControls";
+import ExportModal from "../components/companies/ExportModal";
 import { Search, Download, RefreshCw, Cpu, LogOut, AlertCircle, Layers, ArrowUpRight, X } from "lucide-react";
 
 export default function DashboardPage() {
@@ -15,7 +16,9 @@ export default function DashboardPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
 
+    const [isExportModalOpen, setIsExportModalOpen] = useState(false);
     const [currentPage, setCurrentPage] = useState(1);
+    const [uniquekeyWords, setUniqueKeyWords] = useState<string[]>([]);
     const [companies, setCompanies] = useState<any[]>([]);
     const [totalItems, setTotalItems] = useState(0);
     const [activePlace, setActivePlace] = useState("");
@@ -44,6 +47,10 @@ export default function DashboardPage() {
             });
 
             const newCompanies = response.data.companies || [];
+            const uniqueKeywordsFromApi = response.data.unique_keywords || [];
+
+            setUniqueKeyWords(uniqueKeywordsFromApi);
+            console.log("uniqueKeywordsFromApi:", uniqueKeywordsFromApi);
 
             setCompanies(prev => {
                 if (isNewSearch) return newCompanies;
@@ -54,12 +61,20 @@ export default function DashboardPage() {
             });
 
             setTotalItems(response.data.total_items);
-            const uniqueKeywords = [... new Set(companies.map(c => c.keyword))].filter(Boolean);
-            console.log("Unique Keywords in Current Data:", uniqueKeywords);
         } catch (err) {
             console.error("Error fetching companies:", err);
         }
     }, [status, activePlace, activeLocation, session]);
+
+    useEffect(() => {
+        const originalError = console.error;
+        console.error = (...args) => {
+            if (typeof args[0] === "string" && args[0].includes("fdprocessedid")) {
+                return;
+            }
+            originalError(...args);
+        };
+    }, []);
 
     useEffect(() => {
         const threshold = 3;
@@ -79,8 +94,6 @@ export default function DashboardPage() {
         } else if (status === "unauthenticated") {
             router.push("/login");
         }
-        // قمنا بإزالة fetchCompanies من الـ Dependency Array
-        // وأضفنا شرط companies.length === 0 لضمان التحميل مرة واحدة فقط
     }, [status, router]);
 
     const filteredCompanies = useMemo(() => {
@@ -95,6 +108,7 @@ export default function DashboardPage() {
             const loc = c.location?.toLowerCase() || "";
             const phone = c.phone?.toLowerCase() || "";
             const keyword = c.keyword?.toLowerCase() || "";
+            const source = c.source?.toLowerCase() || "";
 
             // التحقق من وجود كلمة in المترجمة أو الأصلية في الموقع
             const locMatches = loc.includes(query) || loc.includes(`${query} ${inWord}`) || loc.includes(`${inWord} ${query}`);
@@ -103,7 +117,8 @@ export default function DashboardPage() {
                 name.includes(query) ||
                 locMatches ||
                 phone.includes(query) ||
-                keyword.includes(query)
+                keyword.includes(query) ||
+                source.includes(query)
             );
         });
     }, [companies, searchQuery, t]);
@@ -130,14 +145,41 @@ export default function DashboardPage() {
             setActivePlace(keywordInput);
             setActiveLocation(locationInput);
             setCurrentPage(1);
-            // لا تستدعِ fetchCompanies هنا، الـ useEffect القادم سيتولى الأمر
         } catch (err) { console.error(err); } finally { setScraping(false); }
+    };
+
+    const handleExport = async (selectedKeywords: string[], fileName: string) => {
+        try {
+            const params = new URLSearchParams();
+
+            selectedKeywords.forEach(kw => params.append('keywords[]', kw));
+
+            params.append('filename', fileName);
+
+            const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/export_file`, {
+                params: params,
+                headers: { Authorization: `Bearer ${(session as any)?.accessToken}` },
+                responseType: 'blob',
+            });
+
+            const url = window.URL.createObjectURL(new Blob([response.data]));
+            const link = document.createElement('a');
+            link.href = url;
+            link.setAttribute('download', `${fileName}.xlsx`); // استخدام الاسم المخصص
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+            window.URL.revokeObjectURL(url); // تنظيف الذاكرة
+        } catch (err) {
+            console.error("Export failed", err);
+            alert("حدث خطأ أثناء تصدير الملف");
+        }
     };
 
     // 2. هذا الـ Effect يضمن جلب داتا البحث الجديد فقط بمجرد تغير الـ activePlace
     useEffect(() => {
         if (activePlace && activeLocation) {
-            fetchCompanies(100, true); // true تعني "isNewSearch" ليمسح الداتا القديمة
+            fetchCompanies(100, true);
         }
     }, [activePlace, activeLocation]);
 
@@ -212,7 +254,7 @@ export default function DashboardPage() {
                             <label className="block text-xs font-black text-slate-500 dark:text-slate-400 uppercase tracking-wider">{t("platform_label")}</label>
                             <select value={source} onChange={(e) => setSource(e.target.value)} disabled={scraping} className="w-full bg-slate-50 dark:bg-[#0d1117] border border-slate-200/80 dark:border-slate-900 rounded-xl px-4 py-3.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer font-black">
                                 <option value="Google Maps">Google Maps 📍</option>
-                                <option value="LinkedIn">LinkedIn 💼</option>
+                                <option value="Google Maps"></option>
                             </select>
                         </div>
                         <div className="space-y-2">
@@ -260,7 +302,11 @@ export default function DashboardPage() {
                                 <input type="text" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} placeholder={t("search_placeholder")} disabled={scraping} className="bg-white dark:bg-[#0d1117] border border-slate-200 dark:border-slate-900 rounded-xl pl-10 pr-4 py-3 text-sm text-slate-900 dark:text-white focus:outline-none w-full sm:w-80 transition-all focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 font-extrabold disabled:opacity-50 disabled:cursor-not-allowed" />
                             </div>
                             <div className="flex items-center gap-2">
-                                <button onClick={() => console.log("exporting ...")} disabled={scraping || companies.length === 0} className="flex-1 sm:flex-none bg-white hover:bg-slate-50 dark:bg-[#0d1117] dark:hover:bg-[#12161f] text-slate-800 dark:text-slate-200 text-sm font-black px-5 py-3 rounded-xl transition-all flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-900 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                                <button
+                                    onClick={() => setIsExportModalOpen(true)}
+                                    disabled={scraping || companies.length === 0}
+                                    className="flex-1 sm:flex-none bg-white hover:bg-slate-50 dark:bg-[#0d1117] dark:hover:bg-[#12161f] text-slate-800 dark:text-slate-200 text-sm font-black px-5 py-3 rounded-xl transition-all flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-900 shadow-sm disabled:opacity-40 disabled:cursor-not-allowed">
+
                                     <Download size={15} className="text-emerald-500" /> <span>{t("export_btn")}</span>
                                 </button>
                                 <button onClick={handleClearAllFilters} disabled={scraping} className="flex-1 sm:flex-none bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-black px-5 py-3 rounded-xl transition-all shadow-lg shadow-indigo-600/10 whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed">
@@ -293,6 +339,13 @@ export default function DashboardPage() {
             </main>
 
             <CompanyModal company={selectedCompany} onClose={() => setSelectedCompany(null)} />
+
+            <ExportModal
+                isOpen={isExportModalOpen}
+                onClose={() => setIsExportModalOpen(false)}
+                availableKeywords={uniquekeyWords}
+                onExport={handleExport}
+            />
         </div>
     );
 }

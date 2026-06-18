@@ -1,12 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, status , Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError
 from sqlalchemy import text
-from typing import List, Dict, Any , Optional
-import uuid
+from typing import Optional
 from app.database import get_db
-from app import schemas, auth
-from app.config import debug_print
+from app import auth
 from app.models import Company
 
 router = APIRouter()
@@ -26,10 +23,19 @@ def get_companies(
         search_keyword = f"{place.strip()} in {location.strip()}"
         query = query.filter(Company.keyword.ilike(f"%{search_keyword}%"))
 
+    all_keywords_query = db.query(Company.keyword).\
+        filter(Company.user_id == current_user.id).\
+        distinct().\
+        filter(Company.keyword.isnot(None)).\
+        all()
+    
+    keywords_list = [k[0] for k in all_keywords_query]
+
     total_items = query.count()
     companies = query.order_by(Company.id.desc()).limit(limit).all()
     
     return {
         "companies": companies,
-        "total_items": total_items
+        "total_items": total_items,
+        "unique_keywords" : keywords_list
     }
